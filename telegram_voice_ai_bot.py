@@ -1,5 +1,4 @@
 import os
-import openai
 import tempfile
 import speech_recognition as sr
 from pydub import AudioSegment
@@ -11,11 +10,13 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+from openai import OpenAI
 
-# Load tokens from environment
+# Load API tokens from environment variables
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # /start command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -26,7 +27,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     voice = update.message.voice
 
-    # Download voice file
+    # Download voice message
     file = await context.bot.get_file(voice.file_id)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".ogg") as f_ogg:
         await file.download_to_drive(f_ogg.name)
@@ -53,8 +54,6 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Send to OpenAI
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_API_KEY)
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": user_text}],
@@ -71,18 +70,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
 
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": user_text}],
         )
-        ai_reply = response.choices[0].message["content"]
+        ai_reply = response.choices[0].message.content
     except Exception as e:
         ai_reply = f"⚠️ OpenAI error: {e}"
 
     await update.message.reply_text(f"🤖 {ai_reply}")
 
 
-# Main function to start the bot
+# Main function
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
